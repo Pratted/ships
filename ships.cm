@@ -8,16 +8,19 @@ const bool false = 0;
 
 const int DELAY = 10000;
 const int DOWNSTREAM = 0;
-const int UPSTREAM = 1;
+// const int UPSTREAM = 1;
 const int GATE1 = 1;
 const int GATE2 = 2;
 
-int id = 0;
-// int id_down = -1;
+int id_up = 0;
+int id_down = 0;
 
 // return a unique ID based on direction of travel.
 atomic int getId(int dir){
-  return ++id;
+  if(pid == DOWNSTREAM) return ++id_down;
+  else return ++id_up;
+  //error
+  return -1;
 }
 
 atomic void print(string msg){
