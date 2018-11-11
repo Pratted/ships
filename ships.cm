@@ -49,9 +49,12 @@ void pause(){
 monitor ControlTower {
   condition lock_drained;
   condition lock_full;
-  condition lock_occupied;
-  condition lock_available;
-  condition ship_ready;
+
+  condition fill_lock;
+  condition drain_lock;
+
+  condition gate1_ready;
+  condition gate2_ready;
 
   int q_upstream[64];
   int q_downstream[64];
@@ -60,6 +63,7 @@ monitor ControlTower {
   int len_qd;
 
   bool drained;
+  bool occupied;
 
   //string msg;
   //string prefix;
@@ -84,6 +88,30 @@ monitor ControlTower {
  
   void arrive(int ship, int gate){
 
+    // not occupied and empty queue -> this ship can enter
+    if(occupied == false && len_qd + len_qu == 0){
+      occupied = true;
+    }
+
+    // 
+    else {
+      if(gate == GATE1){
+        q_downstream[len_qd] = ship;
+        len_qd++;
+
+        waitc(gate1_ready);
+      }
+      else if(gate == GATE2){
+        q_upstream[len_qu] = ship;
+        len_qd++;
+
+        waitc(gate2_ready);
+      }
+    }
+
+    signal(ship_ready);
+
+
     /*
     if(gate == GATE1) // downstream ships approach gate 1
       stringCopy(prefix, "D");
@@ -101,13 +129,15 @@ monitor ControlTower {
     if(gate == GATE1){
 
       // fill the lock so the ship can enter it.
+      // (this only happens when there are no ships in the other direction)
       if(drained){
         signal(fill_lock);
         wait(lock_full);        
       }
 
       // now the water level is full. open the gate and let the ship enter.
-
+      signal(gate2_ready);
+      
       // send this bitch DOWNNNNN
       signal(drain_lock);
 
@@ -115,25 +145,30 @@ monitor ControlTower {
       wait(lock_drained);
 
       // let other ships know the lock is ready to use.
-      signal(lock_ready);
+      signal(gate1_ready);
     }
     if(gate == GATE2){
+
       if(drained == false){
         signal(drain_lock);
         wait(lock_drained);
       }
 
+      // now the water level is full. open the gate and let the ship enter.
+      signal(gate1_ready);
+
       signal(fill_lock);
 
       wait(lock_full);
 
-      signal(lock_ready);
+      signal(gate2_ready);
     }
   }
 
 
   init {
     drained = true;
+    occupied = false;
   }
 }
 
