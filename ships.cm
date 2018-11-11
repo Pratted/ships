@@ -17,10 +17,8 @@ int id_down = 0;
 
 // return a unique ID based on direction of travel.
 atomic int getId(int dir){
-  if(pid == DOWNSTREAM) return ++id_down;
-  else return ++id_up;
-  //error
-  return -1;
+  if(dir == DOWNSTREAM) return ++id_down;
+  return ++id_up;
 }
 
 atomic void print(string msg){
@@ -58,11 +56,13 @@ monitor ControlTower {
   //string prefix;
 
   void fill(){
+    delay();
     waitc(lock_empty);
   }
   
   void drain(){
-
+    delay();
+    // signalc(lock_empty);
   }
  
   void arrive(int ship, int gate){							
@@ -112,7 +112,7 @@ void waterlevel(int pid){
 main(){
 
   cobegin{
-    waterlevel(0); // 0 -> water level process.
+    waterlevel(); // 0 -> water level process.
     upstream();// upstream(3), upstream(5), upstream(7), upstream(9), upstream(11), upstream(13), upstream(15), 
     downstream(); 
     //, downstream(4), downstream(6), downstream(8), downstream(10), downstream(12), downstream(14), downstream(16)
