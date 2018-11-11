@@ -7,10 +7,31 @@ const bool true = 1;
 const bool false = 0;
 
 const int DELAY = 10000;
-const int UPSTREAM = 0;
 const int DOWNSTREAM = 0;
+const int UPSTREAM = 1;
+const int GATE1 = 1;
+const int GATE2 = 2;
 
-int currid = -1;
+int id_up = -1;
+int id_down = -1;
+
+// return a unique ID based on direction of travel.
+atomic int getid(int dir){
+  if(dir == UPSTREAM) return ++id_up;
+  if(dir == DOWNSTREAM) return ++id_down;
+
+  // error
+  return -1;
+}
+atomic void print(string msg){
+  cout << msg << endl;
+}
+
+void pause(){
+  int i, delay;
+  delay = random(DELAY);
+  while(i++ < delay);
+}
 
 
 //               Gate 1           Gate 2
@@ -26,10 +47,18 @@ int currid = -1;
 //--------------------------------------------------------
 
 monitor ControlTower {
-  condition gate1;
-  condition gate2;
+  condition lock_empty;
+  condition lock_full;
+  condition lock_occupied;
+
+  int q_upstream[64];
+  int q_downstream[64];
+
+  //string msg;
+  //string prefix;
 
   void fill(){
+    waitc(lock_empty);
 
   }
   
@@ -37,9 +66,18 @@ monitor ControlTower {
 
   }
  
-
   void arrive(int ship, int gate){
 
+    /*
+    if(gate == GATE1) // downstream ships approach gate 1
+      stringCopy(prefix, "D");
+    else
+      stringCopy(prefix, "U");
+
+    sprintf(msg, "%s_%d is approaching gate %d",prefix,ship,gate);
+    print(msg);
+    */
+    
   }
 
   int finish;
@@ -48,49 +86,24 @@ monitor ControlTower {
   }
 }
 
-atomic int getid(){
-  return ++currid;
-}
-
-atomic void print(string msg){
-  cout << msg << endl;
-}
-
-void pause(){
-  int i, delay;
-  delay = random(DELAY);
-  while(i++ < delay);
+void downstream(int pid){
+  int i, id;
+  for(i=0;i<5;i++){
+    id = getid(DOWNSTREAM);
+    arrive(id, GATE1);
+  }
 }
 
 void upstream(int pid){
   int i, id;
   for(i=0;i<5;i++){
-    id = getid();
-    arrive(id, UPSTREAM);
-
-  }
-}
-
-void downstream(int pid){
-  int i, id;
-  for(i=0;i<5;i++){
-    id = getid();
-
-  }
-}
-
-// maybe use this instead of upstream/downstream
-void travel(int pid, int gate){
-  int i, id;
-  for(i=0;i<5;i++){
-    id = getid();
-    arrive(id, gate);
+    id = getid(UPSTREAM);
+    arrive(id, GATE2);
   }
 }
 
 // 
 void waterlevel(int pid){
-
   fill();
 
   drain();
