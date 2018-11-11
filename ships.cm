@@ -1,5 +1,5 @@
 //
-//  Eric Pratt
+//  Eric Pratt, Aditya Khandkar
 //
 
 typedef int bool;
@@ -16,13 +16,14 @@ int id_up = -1;
 int id_down = -1;
 
 // return a unique ID based on direction of travel.
-atomic int getid(int dir){
+atomic int getId(int dir){
   if(dir == UPSTREAM) return ++id_up;
   if(dir == DOWNSTREAM) return ++id_down;
 
   // error
   return -1;
 }
+
 atomic void print(string msg){
   cout << msg << endl;
 }
@@ -59,14 +60,13 @@ monitor ControlTower {
 
   void fill(){
     waitc(lock_empty);
-
   }
   
   void drain(){
 
   }
  
-  void arrive(int ship, int gate){
+  void arrive(int ship, int gate){							
 
     /*
     if(gate == GATE1) // downstream ships approach gate 1
@@ -81,6 +81,7 @@ monitor ControlTower {
   }
 
   int finish;
+
   init {
     finish = 0;
   }
@@ -88,16 +89,16 @@ monitor ControlTower {
 
 void downstream(int pid){
   int i, id;
-  for(i=0;i<5;i++){
-    id = getid(DOWNSTREAM);
+  for(i = 0;i < 5;i++){
+    id = getId(DOWNSTREAM);
     arrive(id, GATE1);
   }
 }
 
 void upstream(int pid){
   int i, id;
-  for(i=0;i<5;i++){
-    id = getid(UPSTREAM);
+  for(i = 0;i < 5;i++){
+    id = getId(UPSTREAM);
     arrive(id, GATE2);
   }
 }

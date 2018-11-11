@@ -1,0 +1,1 @@
+bacc $1.cm; bainterp $1.pco;
