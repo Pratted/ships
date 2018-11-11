@@ -47,23 +47,39 @@ void pause(){
 //--------------------------------------------------------
 
 monitor ControlTower {
-  condition lock_empty;
+  condition lock_drained;
   condition lock_full;
   condition lock_occupied;
+  condition lock_available;
+  condition ship_ready;
 
   int q_upstream[64];
   int q_downstream[64];
+
+  int len_qu;
+  int len_qd;
+
+  bool drained;
 
   //string msg;
   //string prefix;
 
   void fill(){
-    waitc(lock_empty);
+    wait(fill_lock); // fill the lock when requested
 
+    // let the water flow into the lock and fill it
+    drained = false;
+
+    // let other processes aware the lock is full.
+    signal(lock_full);
   }
   
   void drain(){
+    waitc(drain_lock);
 
+    drained = true;
+
+    signal(lock_drained);
   }
  
   void arrive(int ship, int gate){
@@ -77,12 +93,47 @@ monitor ControlTower {
     sprintf(msg, "%s_%d is approaching gate %d",prefix,ship,gate);
     print(msg);
     */
-    
   }
 
-  int finish;
+  void enter(int gate){
+
+    // a ship is going to enter gate1
+    if(gate == GATE1){
+
+      // fill the lock so the ship can enter it.
+      if(drained){
+        signal(fill_lock);
+        wait(lock_full);        
+      }
+
+      // now the water level is full. open the gate and let the ship enter.
+
+      // send this bitch DOWNNNNN
+      signal(drain_lock);
+
+      // lock has finished draining. open gate2 and let this guy out.
+      wait(lock_drained);
+
+      // let other ships know the lock is ready to use.
+      signal(lock_ready);
+    }
+    if(gate == GATE2){
+      if(drained == false){
+        signal(drain_lock);
+        wait(lock_drained);
+      }
+
+      signal(fill_lock);
+
+      wait(lock_full);
+
+      signal(lock_ready);
+    }
+  }
+
+
   init {
-    finish = 0;
+    drained = true;
   }
 }
 
@@ -102,11 +153,13 @@ void upstream(int pid){
   }
 }
 
-// 
+// assume the water level starts in the 'drained' state like the diagram
+// this process doesn't give a fuck whether or not theres aship in the lock, it just changes the water level
 void waterlevel(int pid){
-  fill();
-
-  drain();
+  while(1){
+    fill();
+    drain();
+  }
 }
 
 main(){
