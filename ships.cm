@@ -12,23 +12,19 @@ const int UPSTREAM = 1;
 const int GATE1 = 1;
 const int GATE2 = 2;
 
-int id_up = -1;
-int id_down = -1;
+int id = 0;
+// int id_down = -1;
 
 // return a unique ID based on direction of travel.
 atomic int getId(int dir){
-  if(dir == UPSTREAM) return ++id_up;
-  if(dir == DOWNSTREAM) return ++id_down;
-
-  // error
-  return -1;
+  return ++id;
 }
 
 atomic void print(string msg){
   cout << msg << endl;
 }
 
-void pause(){
+void delay(){
   int i, delay;
   delay = random(DELAY);
   while(i++ < delay);
@@ -87,7 +83,7 @@ monitor ControlTower {
   }
 }
 
-void downstream(int pid){
+void downstream(){
   int i, id;
   for(i = 0;i < 5;i++){
     id = getId(DOWNSTREAM);
@@ -95,7 +91,7 @@ void downstream(int pid){
   }
 }
 
-void upstream(int pid){
+void upstream(){
   int i, id;
   for(i = 0;i < 5;i++){
     id = getId(UPSTREAM);
@@ -114,8 +110,8 @@ main(){
 
   cobegin{
     waterlevel(0); // 0 -> water level process.
-    upstream(1);// upstream(3), upstream(5), upstream(7), upstream(9), upstream(11), upstream(13), upstream(15), 
-    downstream(2); 
+    upstream();// upstream(3), upstream(5), upstream(7), upstream(9), upstream(11), upstream(13), upstream(15), 
+    downstream(); 
     //, downstream(4), downstream(6), downstream(8), downstream(10), downstream(12), downstream(14), downstream(16)
   }
 }
