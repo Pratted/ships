@@ -1,0 +1,107 @@
+//
+//  Eric Pratt
+//
+
+typedef int bool;
+const bool true = 1;
+const bool false = 0;
+
+const int DELAY = 10000;
+const int UPSTREAM = 0;
+const int DOWNSTREAM = 0;
+
+int currid = -1;
+
+
+//               Gate 1           Gate 2
+//
+//                --                --
+//DOWNSTREAM -->  ||                ||
+//################||                ||
+//                ||     LOCK       ||
+//                ||                ||    <-- UPSTREAM
+//       WATER    ||################||##################
+//                ||                ||
+//                ||     WATER      ||     WATER
+//--------------------------------------------------------
+
+monitor ControlTower {
+  condition gate1;
+  condition gate2;
+
+  void fill(){
+
+  }
+  
+  void drain(){
+
+  }
+ 
+
+  void arrive(int ship, int gate){
+
+  }
+
+  int finish;
+  init {
+    finish = 0;
+  }
+}
+
+atomic int getid(){
+  return ++currid;
+}
+
+atomic void print(string msg){
+  cout << msg << endl;
+}
+
+void pause(){
+  int i, delay;
+  delay = random(DELAY);
+  while(i++ < delay);
+}
+
+void upstream(int pid){
+  int i, id;
+  for(i=0;i<5;i++){
+    id = getid();
+    arrive(id, UPSTREAM);
+
+  }
+}
+
+void downstream(int pid){
+  int i, id;
+  for(i=0;i<5;i++){
+    id = getid();
+
+  }
+}
+
+// maybe use this instead of upstream/downstream
+void travel(int pid, int gate){
+  int i, id;
+  for(i=0;i<5;i++){
+    id = getid();
+    arrive(id, gate);
+  }
+}
+
+// 
+void waterlevel(int pid){
+
+  fill();
+
+  drain();
+}
+
+main(){
+
+  cobegin{
+    waterlevel(0); // 0 -> water level process.
+    upstream(1);// upstream(3), upstream(5), upstream(7), upstream(9), upstream(11), upstream(13), upstream(15), 
+    downstream(2); 
+    //, downstream(4), downstream(6), downstream(8), downstream(10), downstream(12), downstream(14), downstream(16)
+  }
+}
