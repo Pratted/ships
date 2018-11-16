@@ -1,0 +1,75 @@
+typedef int bool;
+const bool true = 1;
+const bool false = 0;
+
+const int DELAY = 10000;
+const int DOWNSTREAM = 0;
+const int UPSTREAM = 1;
+const int GATE1 = 1;
+const int GATE2 = 2;
+
+int id_up = 0;
+int id_down = 0;
+ 
+// return a unique ID based on direction of travel.
+atomic int getId(int dir) {
+	if(dir == DOWNSTREAM) return ++id_down;
+	return ++id_up;
+}
+
+atomic void printBargeApproaching(int id, int gate) {
+	if(gate == GATE1) {
+		cout << "Downstream barge " << id << " is approaching gate 1." << endl;
+	} else {
+		cout << "Upstream barge " << id << " is approaching gate 2." << endl;
+	}
+}
+
+atomic void print(string msg) {
+	cout << msg << endl;
+}
+
+void delay() {
+	int i, delay;
+	delay = random(DELAY);
+	while(i++ < delay);
+}
+
+monitor ControlTower {
+	condition gate1, gate2; 
+
+	void approachGate(int id, int gate) {
+		if(gate == GATE1) {
+			printBargeApproaching(id, gate);
+		} else {
+			printBargeApproaching(id, gate);
+		}
+	}
+}
+
+void upstreamBarge() {
+	int i, id;
+	for(i = 0; i < 5; i++) {
+		id = getId(UPSTREAM);
+		approachGate(id, GATE2);
+	}
+}
+
+void downStreamBarge() {
+	int i, id;
+	for(i = 0; i < 5; i++) {
+		id = getId(DOWNSTREAM);
+		approachGate(id, GATE1);
+	}
+}
+
+void waterlevel() {
+	
+}
+
+main() {
+	cobegin {
+		upstreamBarge();
+		downStreamBarge();
+	}
+}
