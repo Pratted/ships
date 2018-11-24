@@ -1,0 +1,527 @@
+//
+//  Eric Pratt Aditya Khandkar
+//
+
+typedef int bool;
+const bool true = 1;
+const bool false = 0;
+
+const int DELAY = 100;
+const int DOWNSTREAM = 0;
+const int UPSTREAM = 1;
+const int GATE1 = 1;
+const int GATE2 = 2;
+const int MAX_VISITORS = 80;
+const int EXIT = -1;
+const int NONE = 0;
+const int FILL = 1;
+const int DRAIN = 2;
+const int READY = 3;
+
+int id_up = 0;
+int id_down = 0;
+
+bool drained;
+
+// return a unique ID based on direction of travel.
+atomic int getid(int dir){
+  if(dir == UPSTREAM) return ++id_up;
+  if(dir == DOWNSTREAM) return ++id_down;
+
+  // error
+  return -1;
+}
+
+void pause(){
+  int i, delay;
+  delay = random(DELAY);
+  while(i++ < delay);
+}
+
+//               Gate 1           Gate 2
+//
+//                --                --
+//DOWNSTREAM -->  ||                ||
+//################||                ||
+//                ||     LOCK       ||
+//                ||                ||    <-- UPSTREAM
+//       WATER    ||################||##################
+//                ||                ||
+//                ||     WATER      ||     WATER
+//--------------------------------------------------------
+
+monitor ControlTower {
+  condition gate1_ready;
+  condition gate2_ready;
+  condition water_level; // 
+
+  int q_g1[64];
+  int q_g2[64];
+  int visitors;
+
+  int g1_priority;
+  int g2_priority;
+
+  int g1_head, g1_tail;
+  int g2_head, g2_tail;
+  
+  bool occupied;
+
+  bool g1_closed;
+  bool g2_closed;
+
+  int request;
+
+  string[8] currship;
+  string[8] g1_buf;
+  string[8] g2_buf;
+
+  void printR1(){
+    int i, j, pos;
+
+    for(i = g1_tail - 1, pos = 0; i >= g1_head; i--){
+      cout << q_g1[i] << "~";
+
+      if(q_g1[i] < 10) 
+        pos = pos + 2;
+      else 
+        pos = pos + 3;
+    }
+
+    while(pos < 31){
+      cout << "~";
+      pos++;
+    }
+
+    cout << g1_buf;
+    pos = pos + stringLength(g1_buf);
+
+    while(pos < 36){
+      cout << "~";
+      pos++;
+    }
+
+    // print the top row of chamber...
+    if(g1_closed)
+      cout << "|";
+    else
+      cout << "-";
+    pos++;
+
+    // full
+    if(drained == false){
+      cout << "~";
+      pos++;
+
+      // print ship in chamber if there is one
+      cout << currship;
+      pos = pos + stringLength(currship);           
+
+      while(pos < 43){
+        cout << "~";
+        pos++;
+      }
+
+      cout << "|";
+    }
+    cout << endl;    
+  }
+  void printR2(){
+    int i, j, pos;
+
+    // left fill 2nd line with spaces...
+    for(i = 0; i < 36; i++)
+      cout << " ";
+
+    // bottom row of chamber...
+    cout << "|~";
+    pos = 38;
+
+    if(drained){
+      cout << currship;
+      pos = pos + stringLength(currship);       
+    }
+
+    while(pos < 43){
+      cout << "~";
+      pos++;
+    }
+
+    if(g2_closed)
+      cout << "|";
+    else
+      cout << "-";
+
+    cout << "~~~";
+    pos = 3;
+
+    // not already in chamber... (avoid double printing same ship)
+    if(stringLength(currship) == 0){
+      cout << g2_buf;
+      pos = pos + stringLength(g2_buf);     
+    }
+
+    while(pos < 10){
+      cout << "~";
+      pos++;
+    }
+
+    for(i = g2_head; i < g2_tail; i++){
+      cout << q_g2[i] << "~";
+
+      if(q_g2[i] < 10) // 5~ (2 chars)
+        pos = pos + 2;
+      else 
+        pos = pos + 3; // 12~ (3 chars)
+    }
+
+    while(pos < 36){
+      cout << "~";
+      pos++;
+    }
+    cout << endl;
+  }
+  void printR3(){
+    int i;
+    for(i = 0; i < 44; i++)
+      if(i == 36 || i == 43) 
+        cout << "|";
+      else 
+        cout << " ";
+    cout << endl;
+  }
+
+  void printstate(){
+    cout << endl;
+    printR1();
+    printR2();
+    printR3();
+    cout << endl;
+  }
+
+  // tells waterlevel process what to do (EXIT, NONE, FILL, DRAIN)
+  int getRequest(){
+    int copy;
+    copy = request;
+    request = NONE; // reset the request to avoid sending multiple FILL/DRAIN requests
+    return copy; 
+  }
+
+  void gateReady(int gate){
+    if(gate == GATE1) drained = false;
+    if(gate == GATE2) drained = true;
+
+    signalc(water_level);
+  }
+
+  void enter(int ship, int gate){
+    cout << "Gate " << gate << " has finished opening" << endl;
+
+    if(gate == GATE1){
+      stringCopy(currship, g1_buf);
+      stringCopy(g1_buf, ""); // remove ship from buffer
+      cout << "Barge " << currship << " enters the chamber" << endl;
+    }
+    if(gate == GATE2){
+      stringCopy(currship, g2_buf); 
+      stringCopy(g2_buf, ""); // remove ship from buffer
+      cout << "Barge " << currship << " enters the chamber" << endl;
+    }
+    printstate();
+    cout << "Gate " << gate << " begins to close" << endl;
+  }
+
+  void useLock(int ship, int gate){
+    cout << "Gate " << gate << " is now closed" << endl;
+
+    if(gate == GATE1){
+      g1_closed = true;
+
+      printstate();
+      request = DRAIN; // travel to gate 2
+    } 
+    if(gate == GATE2){
+      g2_closed = true;    
+
+      printstate();
+      request = FILL; // travel to gate 1
+    } 
+
+    // wait for the water level to finish adjusting before the ship calls opengate().
+    waitc(water_level);
+
+    // traveling from gate2 to gate1
+    if(gate == GATE1){
+      cout << "The water level has finished draining" << endl; 
+      printstate();
+
+      // print prior to the opengate() to keep prints inside the monitor
+      cout << "Gate 2 opens" << endl;
+      g2_closed = false;
+      printstate();
+    }  
+    if(gate == GATE2){
+      cout << "The water level has finished rising" << endl;
+      printstate();
+
+      cout << "Gate 1 opens" << endl;
+      g1_closed = false;
+      printstate();   
+    }
+
+    // now the ship can call opengate()
+  }
+
+  void leaveGate(int ship, int gate){
+    if(gate == GATE1){
+      cout << "Barge " << currship << " exits through gate " << gate << endl;
+      stringCopy(currship, "");
+      printstate();
+
+      cout << "Gate " << gate << " begins to close" << endl;
+      g1_closed = true;
+    }
+    if(gate == GATE2){
+      cout << "Barge " << currship << " exits through gate " << gate << endl;
+      stringCopy(currship, "");
+      printstate();
+
+      cout << "Gate " << gate << " begins to close" << endl;
+      g2_closed = true;
+    }    
+  }
+
+  void releaseGate(int ship, int gate){
+    occupied = false; // since the ship has left it marks the lock as unoccupied
+    cout << "Gate " << gate << " is closed" << endl;
+    
+    if(gate == GATE1){
+      g1_closed = true;
+      printstate();
+      
+      if(g1_tail > g1_head) // prioritize gate2 since waterlevel won't need to be adjusted.
+        signalc(gate1_ready);
+      else if(g2_tail > g2_head) // back-to-back gate1 ships 
+        signalc(gate2_ready);        
+    }
+    if(gate == GATE2){
+      g2_closed = true;
+      printstate();
+      
+      if(g2_tail > g2_head)
+        signalc(gate2_ready);
+      else if(g1_tail > g1_head)
+        signalc(gate1_ready);       
+    }
+
+    visitors++;
+    if(visitors == MAX_VISITORS){
+      request = EXIT;
+    }
+  }
+
+  void requestGate(int ship, int gate){
+    printstate();
+
+    if(gate == GATE1){
+      
+      // lock needs to be filled before the ship can enter.
+      // (this only happens if one or both of the queues are empty)
+      if(drained){
+        request = FILL; // set the request so waterlevel process can adjust the level
+        cout << "The water level begins to rise." << endl;
+        waitc(water_level);  
+        cout << "The water level has finished rising." << endl;
+      } 
+
+      cout << "Gate " << gate << " opens" << endl; 
+      g1_closed = false;
+      printstate();
+    }
+
+    if(gate == GATE2){
+      // inverse of GATE1
+      if(drained == false){
+        request = DRAIN;
+        cout << "The water level begins to drain." << endl;
+        waitc(water_level);
+        cout << "The water level has finished draining." << endl;
+      }
+
+      cout << "Gate " << gate << " opens" << endl; 
+      g2_closed = false;
+      printstate();
+    }
+  }
+
+  void enqueue(int ship, int gate){
+     if(gate == GATE1){
+      q_g1[g1_tail] = ship;
+      g1_tail++;      
+    }
+    if(gate == GATE2){
+      q_g2[g2_tail] = ship;
+      g2_tail++;      
+    }   
+  }
+
+  void dequeue(int gate){
+    if(gate == GATE1){
+      q_g1[g1_head] = -1;
+      g1_head++;
+    } 
+    if(gate == GATE2){
+      q_g2[g2_head] = -1;
+      g2_head++;
+    }  
+  }
+
+  void arrive(int ship, int gate){
+    string[8] shipname;
+    char dir;
+
+    if(gate == GATE1) dir = 'D';
+    if(gate == GATE2) dir = 'U';
+
+    // build ship name, (D_5, U_1, D_13, etc)
+    sprintf(shipname, "%c_%d", dir, ship);
+    cout << "Barge " << shipname << " arrives at gate " << gate << endl;
+
+    // enqueue in a seperate queue used for printing..
+    enqueue(ship, gate);
+
+    // there is another ship ahead of us
+    if(occupied){
+      if(gate == GATE1){
+        cout << "Barge " << shipname << " enters the queue for gate " << gate << endl;
+        waitc(gate1_ready, g1_priority++); // actual baci queue :)
+             
+      }
+      if(gate == GATE2){
+        cout << "Barge " << shipname << " enters the queue for gate " << gate << endl;
+        waitc(gate2_ready, g2_priority++);   
+      }
+    }
+
+    dequeue(gate);
+
+    // move the ship into the respective buffer before the actually enter the gate (mostly for print functions)
+    if(gate == GATE1) stringCopy(g1_buf, shipname); 
+    if(gate == GATE2) stringCopy(g2_buf, shipname); 
+
+    // mark as occupied HERE so future ships must block in the if(occupied) block.
+    occupied = true;
+
+    cout << "Barge " << shipname << " will enter the chamber through gate " << gate << endl;
+  }
+
+  init {
+    drained = true;
+    occupied = false;
+    visitors = 0;
+
+    g1_head = 0; g1_tail = 0;
+    g2_head = 0; g2_tail = 0;
+    g1_closed = true;
+    g2_closed = true;
+  } 
+}
+
+
+void openGate(int id, int gate){
+  pause();
+}
+
+void closeGate(int id, int gate){
+  pause();
+}
+
+void downstream(int pid){
+  int i, id;
+  for(i=0;i<5;i++){
+    id = getid(DOWNSTREAM);
+    pause();
+    arrive(id, GATE1);
+    requestGate(id, GATE1);
+
+    // the ship opens the gate
+    openGate(id, GATE1);
+
+    // update some monitor variables for printing
+    enter(id, GATE1);
+
+    // closes the gate
+    closeGate(id, GATE1);
+
+    // notify the monitor
+    useLock(id, GATE1);
+
+    openGate(id, GATE2);
+
+    // update some monitor variables for printing
+    leaveGate(id, GATE2);
+
+    closeGate(id, GATE2);
+
+    // notitfy other ships that the gate is ready...
+    releaseGate(id, GATE2);
+  }
+}
+
+void upstream(int pid){
+  int i, id;
+  for(i=0;i<5;i++){
+    id = getid(UPSTREAM);
+    pause();
+    arrive(id, GATE2);
+    requestGate(id, GATE2);
+    openGate(id, GATE2);
+    enter(id, GATE2);
+    closeGate(id, GATE2);
+    useLock(id, GATE2);
+    openGate(id, GATE1);
+    leaveGate(id, GATE1);
+    closeGate(id, GATE1);
+    releaseGate(id, GATE1);
+  }
+}
+
+// fill the lock outside the monitor so other ships can arrive as the lock is being filled.
+void fill(){
+  pause();
+  gateReady(GATE1);
+}
+
+void drain(){
+  pause();
+  gateReady(GATE2);
+}
+
+// assume the water level starts in the 'drained' state like the diagram
+void waterlevel(int pid){
+  int request;
+  request = NONE;
+
+  // spin lock waiting for requests to adjust the water level
+  while(request != EXIT){
+    request = getRequest();
+
+    if(request == FILL){
+      fill();
+    }
+    if(request == DRAIN){
+      drain();
+    } 
+    //pause(); // wait a little before checking next request
+  }
+}
+
+main(){
+
+  cobegin{
+    waterlevel(0); // 0 -> water level process.
+    upstream(1); upstream(3); upstream(5); upstream(7); upstream(9); upstream(11); upstream(13); upstream(15); 
+    downstream(2); downstream(4); downstream(6); downstream(8); downstream(10); 
+    downstream(12); downstream(14); downstream(16);
+  }
+}
